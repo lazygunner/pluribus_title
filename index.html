@@ -84,14 +84,20 @@
     <script>
         const canvas = document.getElementById('canvas1');
         const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
+
+        function setCanvasSize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        setCanvasSize();
 
         let particles = []; 
         let waves = [];
         let frameCount = 0;
         let fontLoaded = false;
+        let hasInitialized = false; // guard to avoid missing the first init
         let audioStarted = false;
+        const FONT_READY_FALLBACK_MS = 1800;
 
         const config = {
             waveSpeed: 6, 
@@ -230,8 +236,11 @@
             }
         }
 
-        function init() {
-            if (!fontLoaded) return; 
+        function init(allowFallbackFont = false) {
+            if (!fontLoaded && !allowFallbackFont) return; 
+
+            setCanvasSize();
+            hasInitialized = true;
 
             particles = [];
             waves = [];
@@ -330,7 +339,7 @@
             ctx.fillStyle = 'rgba(0, 0, 0, 0.4)'; 
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            if (fontLoaded) {
+            if (hasInitialized) {
                 frameCount++;
                 if (frameCount % config.waveFrequency === 0) {
                     waves.push(new Wave(config.pCenterX, config.pCenterY));
@@ -380,14 +389,26 @@
         overlay.addEventListener('click', activateSystem);
 
         window.addEventListener('resize', () => {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            init();
+            init(true);
         });
 
-        document.fonts.ready.then(function() {
+        const fontReadyPromise = document.fonts ? document.fonts.ready : Promise.resolve();
+        fontReadyPromise.then(function() {
             fontLoaded = true;
-            init();
+            init(true);
+        });
+
+        // 容错：字体加载超时或 Promise 未触发时仍尝试初始化，避免首屏空白或错乱
+        setTimeout(() => {
+            if (!hasInitialized) {
+                init(true);
+            }
+        }, FONT_READY_FALLBACK_MS);
+
+        window.addEventListener('load', () => {
+            if (!hasInitialized) {
+                init(true);
+            }
         });
 
         animate();
