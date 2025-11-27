@@ -103,12 +103,13 @@
             waveSpeed: 6, 
             waveFrequency: 140, 
             waveStrength: 2.0,   
-            waveBandWidth: 50,   
-            bgGridGap: 26,       
+            waveBandWidth: 50,   // will be tuned per screen
+            bgGridGap: 26,       // will be tuned per screen
             
-            textureSpacing: 11,     
-            textureThickness: 1.4,  
-            textBaseJitter: 0.6,    
+            textureSpacing: 11,     // will be tuned per screen
+            textureThickness: 1.4,  // will be tuned per screen
+            textBaseJitter: 0.6,    // will be tuned per screen
+            sampleStep: 2,          // will be tuned per screen
             bgAlpha: 0.9,           
             
             gapScaleX: 1.1, 
@@ -117,6 +118,42 @@
             additiveParticleCount: 0, 
             pCenterX: 0, pCenterY: 0
         };
+
+        // 小屏调参，增加取样密度和线条厚度，让字形更完整
+        function applyResponsiveTuning() {
+            const shortSide = Math.min(canvas.width, canvas.height);
+            const compact = shortSide <= 520;
+
+            config.textureSpacing = compact ? 7 : 11;
+            config.textureThickness = compact ? 2.4 : 1.4;
+            config.textBaseJitter = compact ? 0.25 : 0.6;
+            config.bgGridGap = compact ? 22 : 26;
+            config.waveBandWidth = compact ? 36 : 50;
+            config.sampleStep = compact ? 1 : 2;
+        }
+
+        // 根据可用空间动态调整字体，避免小屏幕文字溢出
+        function getResponsiveFontSize() {
+            const base = Math.min(canvas.width / 6, 200);
+            const text = "PLUR1BUS";
+            let size = base;
+
+            const maxWidth = canvas.width * 0.86;  // 留点边距
+            const maxHeight = canvas.height * 0.55; // 过高会顶到边缘
+
+            ctx.font = '900 ' + size + 'px "Montserrat", sans-serif';
+            let width = ctx.measureText(text).width;
+
+            if (width > maxWidth) {
+                size = size * (maxWidth / width);
+            }
+            if (size > maxHeight) size = maxHeight;
+
+            const minSize = Math.min(40, maxHeight);
+            if (size < minSize) size = minSize;
+
+            return size;
+        }
 
         // --- 粒子类 ---
         class Particle {
@@ -242,10 +279,12 @@
             setCanvasSize();
             hasInitialized = true;
 
+            applyResponsiveTuning();
+
             particles = [];
             waves = [];
 
-            let fontSize = Math.min(canvas.width / 6, 200); 
+            let fontSize = getResponsiveFontSize();
             ctx.font = '900 ' + fontSize + 'px "Montserrat", sans-serif';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
             
@@ -314,7 +353,7 @@
             let restData = scanText(restText, startX + pWidth + restWidth/2, config.pCenterY);
 
             function createTextParticles(imageData) {
-                const step = 2; 
+                const step = config.sampleStep; 
                 for (let y = 0; y < imageData.height; y += step) {
                     for (let x = 0; x < imageData.width; x += step) {
                         let isTextPixel = imageData.data[(y * 4 * imageData.width) + (x * 4) + 3] > 128;
